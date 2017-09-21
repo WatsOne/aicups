@@ -16,7 +16,7 @@
     </properties>
 
     <build>
-        <finalName>java1.8_client</finalName>
+        <finalName>baseline</finalName>
         <plugins>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -37,7 +37,6 @@
     </build>
 
     <dependencies>
-        <!-- https://mvnrepository.com/artifact/com.googlecode.json-simple/json-simple -->
         <dependency>
             <groupId>net.java.openjfx.backport</groupId>
             <artifactId>openjfx-78-backport</artifactId>
