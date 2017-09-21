@@ -1,5 +1,7 @@
 package core;
 
+import core.API.Elevator;
+
 public enum ElevatorState {
     /**
      * В этом состоянии лифт находится краткое время (1 тик в данный момент)
@@ -35,5 +37,19 @@ public enum ElevatorState {
 
     public int getCode() {
         return code;
+    }
+
+    public static ElevatorState parse(Integer code) {
+        if (code == null) {
+            return null;
+        }
+
+        for (ElevatorState state : values()) {
+            if (state.code == code) {
+                return state;
+            }
+        }
+
+        return null;
     }
 }

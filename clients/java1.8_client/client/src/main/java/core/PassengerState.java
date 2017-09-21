@@ -52,4 +52,18 @@ public enum PassengerState {
     public int getCode() {
         return code;
     }
+
+    public static PassengerState parse(Integer code) {
+        if (code == null) {
+            return null;
+        }
+
+        for (PassengerState state : values()) {
+            if (state.code == code) {
+                return state;
+            }
+        }
+
+        return null;
+    }
 }
