@@ -1,5 +1,6 @@
 package core
 
+import com.sun.org.apache.xpath.internal.operations.Bool
 import core.API.Elevator
 import core.API.Passenger
 
@@ -17,8 +18,8 @@ class MyPassenger(val passenger: Passenger) {
     val destFloor: Int?
         get() = passenger.destFloor
 
-    val state: PassengerState?
-        get() = PassengerState.parse(passenger.state)
+    val state: PassengerState
+        get() = PassengerState.parse(passenger.state)!!
 
     val timeToAway: Int?
         get() = passenger.timeToAway
@@ -26,8 +27,8 @@ class MyPassenger(val passenger: Passenger) {
     val type: String
         get() = passenger.type
 
-    val floor: Int?
-        get() = passenger.floor
+    val floor: Int
+        get() = passenger.floor!!
 
     val x: Double?
         get() = passenger.x

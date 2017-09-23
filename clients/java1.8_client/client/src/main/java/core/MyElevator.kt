@@ -4,6 +4,9 @@ import core.API.Elevator
 import core.API.Passenger
 
 class MyElevator(val elevator: Elevator) {
+    companion object {
+        const val MAX = 20
+    }
 
     val id: Int?
         get() = elevator.id
@@ -11,11 +14,20 @@ class MyElevator(val elevator: Elevator) {
     val y: Double?
         get() = elevator.y
 
-    val passengers: List<Passenger>
-        get() = elevator.passengers
+    val passengers: List<MyPassenger>
+        get() = elevator.passengers.convert()
 
-    val state: ElevatorState?
-        get() = ElevatorState.parse(elevator.state)
+    val currentPassengers: Int
+        get() = elevator.passengers.size
+
+    val full: Boolean
+        get() = currentPassengers >= MAX
+
+    val empty: Boolean
+        get() = currentPassengers == 0
+
+    val state: ElevatorState
+        get() = ElevatorState.parse(elevator.state)!!
 
     val speed: Double?
         get() = elevator.speed
@@ -23,7 +35,7 @@ class MyElevator(val elevator: Elevator) {
     val timeOnFloor: Int?
         get() = elevator.timeOnFloor
 
-    val floor: Int?
+    val floor: Int
         get() = elevator.floor
 
     val type: String
@@ -34,5 +46,10 @@ class MyElevator(val elevator: Elevator) {
 
     fun goToFloor(floor: Int?) {
         elevator.goToFloor(floor)
+    }
+
+    fun goToAvgFloor() {
+        val avgFloor = elevator.passengers.map { it.destFloor }.average()
+        goToFloor(avgFloor.toInt())
     }
 }
