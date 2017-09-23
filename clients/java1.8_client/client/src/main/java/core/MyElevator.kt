@@ -49,7 +49,6 @@ class MyElevator(val elevator: Elevator) {
     }
 
     fun goToAvgFloor() {
-        val avgFloor = elevator.passengers.map { it.destFloor }.average()
-        goToFloor(avgFloor.toInt())
+        goToFloor(elevator.passengers.map { it.destFloor }.avgFloor())
     }
 }
