@@ -93,7 +93,7 @@ class WorldHandler(object):
     api = API()
     red_client = None
     blue_client = None
-    ticks_count = int(os.environ.get('TICKS_COUNT', 7200))
+    ticks_count = int(os.environ.get('TICKS_COUNT', 4000))
     result = []
 
     client_player = {}
