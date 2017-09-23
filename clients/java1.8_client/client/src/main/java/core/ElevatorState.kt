@@ -1,8 +1,6 @@
-package core;
+package core
 
-import core.API.Elevator;
-
-public enum ElevatorState {
+enum class ElevatorState(val code: Int) {
     /**
      * В этом состоянии лифт находится краткое время (1 тик в данный момент)
      * между закрытием дверей и отправкой на заказанный этаж
@@ -29,27 +27,15 @@ public enum ElevatorState {
      */
     CLOSING(4);
 
-    private int code;
 
-    ElevatorState(int code) {
-        this.code = code;
-    }
+    companion object {
 
-    public int getCode() {
-        return code;
-    }
-
-    public static ElevatorState parse(Integer code) {
-        if (code == null) {
-            return null;
-        }
-
-        for (ElevatorState state : values()) {
-            if (state.code == code) {
-                return state;
+        fun parse(code: Int?): ElevatorState? {
+            if (code == null) {
+                return null
             }
-        }
 
-        return null;
+            return values().firstOrNull { it.code == code }
+        }
     }
 }

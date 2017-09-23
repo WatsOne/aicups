@@ -1,6 +1,6 @@
-package core;
+package core
 
-public enum PassengerState {
+enum class PassengerState(val code: Int) {
     /**
      * В этом состоянии пассажир ждет лифта. Новые пассажиры появляются на этаже именно в этом состоянии
      */
@@ -43,27 +43,15 @@ public enum PassengerState {
      */
     EXITING(6);
 
-    private int code;
 
-    PassengerState(int code) {
-        this.code = code;
-    }
+    companion object {
 
-    public int getCode() {
-        return code;
-    }
-
-    public static PassengerState parse(Integer code) {
-        if (code == null) {
-            return null;
-        }
-
-        for (PassengerState state : values()) {
-            if (state.code == code) {
-                return state;
+        fun parse(code: Int?): PassengerState? {
+            if (code == null) {
+                return null
             }
-        }
 
-        return null;
+            return values().firstOrNull { it.code == code }
+        }
     }
 }
