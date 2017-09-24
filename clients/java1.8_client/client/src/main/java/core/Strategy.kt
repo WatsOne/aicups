@@ -2,15 +2,14 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-import mu.KLogging
 
 class Strategy : BaseStrategy() {
-    companion object: KLogging()
+//    companion object: KLogging()
     var tick = 0
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
     private fun List<MyPassenger>.onTheFloor(floor: Int): Boolean = this.any{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
-    private fun List<MyPassenger>.fromFloor(floor: Int): List<MyPassenger> = this.filter{ it.floor == floor }
+    private fun List<MyPassenger>.getFromFloor(floor: Int): List<MyPassenger> = this.filter{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
     private fun List<MyPassenger>.runningToElevator(e: MyElevator): Int = this.filter{ it.state == PassengerState.MOVING_TO_ELEVATOR && it.elevator == e.id }.size
 
     override fun onTick(myPassengers: List<Passenger>, myElevators: List<Elevator>, enemyPassengers: List<Passenger>, enemyElevators: List<Elevator>) {
@@ -20,7 +19,7 @@ class Strategy : BaseStrategy() {
 
     private fun processTick(passengers: List<MyPassenger>, elevators: List<MyElevator>, enemyPassengers: List<MyPassenger>, enemyElevators: List<MyElevator>) {
         elevators.forEach {
-            if (it.state == ElevatorState.FILLING && !it.full && (passengers.onTheFloor(it.floor) || enemyPassengers.onTheFloor(it.floor))) {
+            if ((tick <= 1600 && !it.full) || (it.state == ElevatorState.FILLING && !it.full && (passengers.onTheFloor(it.floor) || enemyPassengers.onTheFloor(it.floor)))) {
                 toWelcome(passengers, it)
                 toWelcome(enemyPassengers, it)
             } else if (passengers.runningToElevator(it) == 0 && enemyPassengers.runningToElevator(it) == 0) {
@@ -37,10 +36,12 @@ class Strategy : BaseStrategy() {
     }
 
     private fun toWelcome(passengers: List<MyPassenger>, e: MyElevator) {
-        passengers.fromFloor(e.floor).forEach {
-            if (it.state == PassengerState.WAITING_FOR_ELEVATOR) {
-                if (passengers.runningToElevator(e) + e.currentPassengers < MyElevator.MAX) {
-                    it.setElevator(e.elevator)
+        passengers.getFromFloor(e.floor).forEach {
+            if (passengers.runningToElevator(e) + e.currentPassengers < MyElevator.MAX) {
+                if (tick <= 1600) {
+                    it.setElevatorOnStart(e)
+                } else {
+                    it.setElevator(e)
                 }
             }
         }
