@@ -15,7 +15,7 @@ class MyElevator(val elevator: Elevator) {
         get() = elevator.y
 
     val passengers: List<MyPassenger>
-        get() = elevator.passengers.convert()
+        get() = elevator.passengers.map { MyPassenger(it, type == it.type) }
 
     val currentPassengers: Int
         get() = elevator.passengers.size
@@ -46,9 +46,5 @@ class MyElevator(val elevator: Elevator) {
 
     fun goToFloor(floor: Int?) {
         elevator.goToFloor(floor)
-    }
-
-    fun goToAvgFloor() {
-        goToFloor(elevator.passengers.map { it.destFloor }.avgFloor())
     }
 }

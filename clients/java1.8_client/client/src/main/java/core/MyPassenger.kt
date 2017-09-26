@@ -2,7 +2,7 @@ package core
 
 import core.API.Passenger
 
-class MyPassenger(val passenger: Passenger) {
+class MyPassenger(private val passenger: Passenger, val isMy: Boolean) {
 
     val id: Int?
         get() = passenger.id
@@ -37,26 +37,7 @@ class MyPassenger(val passenger: Passenger) {
 //    val weight: Double?
 //        get() = passenger.weight
 
-    fun isMy(imFirst: Boolean): Boolean {
-        return imFirst && type == "FIRST_PLAYER" || !imFirst && type == "SECOND_PLAYER"
-    }
-
     fun setElevator(elevator: MyElevator) {
         passenger.setElevator(elevator.elevator)
-    }
-
-    fun setElevatorOnStart(e: MyElevator) {
-        if ((e.id == 1 || e.id == 8) && (destFloor == 2 || destFloor == 3)) {
-            passenger.setElevator(e.elevator)
-        }
-        if ((e.id == 3 || e.id == 6) && (destFloor == 4 || destFloor == 5)) {
-            passenger.setElevator(e.elevator)
-        }
-        if ((e.id == 5 || e.id == 4) && (destFloor == 6 || destFloor == 7)) {
-            passenger.setElevator(e.elevator)
-        }
-        if ((e.id == 7 || e.id == 2) && (destFloor == 8 || destFloor == 9)) {
-            passenger.setElevator(e.elevator)
-        }
     }
 }
