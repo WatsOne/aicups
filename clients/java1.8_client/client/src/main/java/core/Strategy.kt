@@ -2,10 +2,12 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
+import mu.KLogging
 
 class Strategy : BaseStrategy() {
-//    companion object: KLogging()
+    companion object: KLogging()
     var tick = 0
+    var imFirst = false
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
     private fun List<MyPassenger>.onTheFloor(floor: Int): Boolean = this.any{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
@@ -14,11 +16,13 @@ class Strategy : BaseStrategy() {
 
     override fun onTick(myPassengers: List<Passenger>, myElevators: List<Elevator>, enemyPassengers: List<Passenger>, enemyElevators: List<Elevator>) {
         tick++
+        imFirst = myElevators[0].type == "FIRST_PLAYER"
+
         processTick(myPassengers.convert(), myElevators.convert(), enemyPassengers.convert(), enemyElevators.convert())
     }
 
     private fun processTick(passengers: List<MyPassenger>, elevators: List<MyElevator>, enemyPassengers: List<MyPassenger>, enemyElevators: List<MyElevator>) {
-        elevators.forEach {
+        elevators.filter { it.state == ElevatorState.FILLING }.forEach {
             if ((tick <= 1600 && !it.full) || (it.state == ElevatorState.FILLING && !it.full && (passengers.onTheFloor(it.floor) || enemyPassengers.onTheFloor(it.floor)))) {
                 toWelcome(passengers, it)
                 toWelcome(enemyPassengers, it)
@@ -29,7 +33,7 @@ class Strategy : BaseStrategy() {
 
                     it.goToFloor(totalOnFloor.avgFloor())
                 } else {
-                    it.goToAvgFloor()
+                    it.goToFloor(getBestScoredFloor(it).first)
                 }
             }
         }
@@ -38,12 +42,24 @@ class Strategy : BaseStrategy() {
     private fun toWelcome(passengers: List<MyPassenger>, e: MyElevator) {
         passengers.getFromFloor(e.floor).forEach {
             if (passengers.runningToElevator(e) + e.currentPassengers < MyElevator.MAX) {
-                if (tick <= 1600) {
-                    it.setElevatorOnStart(e)
-                } else {
+//                if (tick <= 1600) {
+//                    it.setElevatorOnStart(e)
+//                } else {
                     it.setElevator(e)
-                }
+//                }
             }
         }
+    }
+
+    private fun getBestScoredFloor(e: MyElevator): Pair<Int, Double> {
+        return e.passengers.groupingBy { it.destFloor }
+                .aggregate {_: Int, sum: Int?, p: MyPassenger, first: Boolean ->
+                    Math.abs(p.fromFloor - p.destFloor) * (if (p.isMy(imFirst)) 10 else 20) + if (first) 0 else sum!!}
+                .mapValues { it.value.toDouble() / (Math.abs(e.floor - it.key) * 50 + 200) }
+                .maxBy { it.value }?.let { Pair(it.key, it.value) } ?: Pair(0, 0.0)
+    }
+
+    private fun stayPoint(e: MyElevator, my: List<MyPassenger>, enemy: List<MyPassenger>): Double {
+        return 0.0
     }
 }

@@ -1,7 +1,5 @@
 package core
 
-import com.sun.org.apache.xpath.internal.operations.Bool
-import core.API.Elevator
 import core.API.Passenger
 
 class MyPassenger(val passenger: Passenger) {
@@ -12,11 +10,11 @@ class MyPassenger(val passenger: Passenger) {
     val elevator: Int?
         get() = passenger.elevator
 
-    val fromFloor: Int?
-        get() = passenger.fromFloor
+    val fromFloor: Int
+        get() = passenger.fromFloor!!
 
-    val destFloor: Int?
-        get() = passenger.destFloor
+    val destFloor: Int
+        get() = passenger.destFloor!!
 
     val state: PassengerState
         get() = PassengerState.parse(passenger.state)!!
@@ -38,6 +36,10 @@ class MyPassenger(val passenger: Passenger) {
 
 //    val weight: Double?
 //        get() = passenger.weight
+
+    fun isMy(imFirst: Boolean): Boolean {
+        return imFirst && type == "FIRST_PLAYER" || !imFirst && type == "SECOND_PLAYER"
+    }
 
     fun setElevator(elevator: MyElevator) {
         passenger.setElevator(elevator.elevator)
