@@ -37,6 +37,9 @@ class MyPassenger(private val passenger: Passenger, val isMy: Boolean) {
 //    val weight: Double?
 //        get() = passenger.weight
 
+    val score: Int
+        get() = if (isMy) 10 else 20
+
     fun setElevator(elevator: MyElevator) {
         passenger.setElevator(elevator.elevator)
     }
