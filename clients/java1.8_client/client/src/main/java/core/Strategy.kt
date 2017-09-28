@@ -2,6 +2,7 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
+//import mu.KLogging
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -58,15 +59,22 @@ class Strategy : BaseStrategy() {
     private fun toWelcome(passengers: List<MyPassenger>, e: MyElevator): Int {
         var count = 0
 
-        passengers.getFromFloor(e.floor).forEach {
-            if (passengers.runningToElevator(e) + e.currentPassengers < MyElevator.MAX) {
-                val totalPassengers = e.passengers.plus(passengers.filter { it.state != PassengerState.USING_ELEVATOR && it.elevator == e.id })
-                val currentScore = getScore(totalPassengers, e.floor)
-                val newScore = getScore(totalPassengers.plus(it), e.floor)
-                if (newScore.second > currentScore.second) {
+        var need = MyElevator.MAX - (passengers.runningToElevator(e) + e.currentPassengers)
+        val totalPassengers = e.passengers.plus(passengers.filter { it.state != PassengerState.USING_ELEVATOR && it.elevator == e.id }).toMutableList()
+
+        while (need > 0) {
+            val bestGroup = passengers.getFromFloor(e.floor).groupBy { it.destFloor }
+                    .mapValues { getScore(totalPassengers.plus(it.value), e.floor) }.maxBy { it.value.second }
+
+            if (bestGroup?.value?.second ?: 0.0 > getScore(totalPassengers, e.floor).second) {
+                passengers.getFromFloor(e.floor).filter { it.destFloor == bestGroup?.key }.forEach {
                     it.setElevator(e)
+                    totalPassengers.add(it)
+                    need--
                     count++
                 }
+            } else {
+                break
             }
         }
 
@@ -79,6 +87,11 @@ class Strategy : BaseStrategy() {
                     Math.abs(p.fromFloor - p.destFloor) * p.score + if (first) 0 else sum!!
                 }
                 .mapValues { Pair(it.value, (Math.abs(currentFloor - it.key) * 50 + 240)) }
+
+        if (scoredFloors.size == 1) {
+            val floor = passengers[0].destFloor
+            return Pair(floor, scoredFloors[floor]!!.first.toDouble() / scoredFloors[floor]!!.second)
+        }
 
         var firstFloor = 1
         var maxScore = 0.0
