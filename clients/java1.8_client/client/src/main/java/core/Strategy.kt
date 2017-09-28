@@ -2,10 +2,13 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-import mu.KLogging
+import java.util.*
+import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
 //    companion object: KLogging()
+    var startFloors = Arrays.asList(2, 3, 4, 5, 6, 7, 8, 9).toMutableList()
+    var startFloorMap = HashMap<Int, Pair<Int, Int>>()
     var tick = 0
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
@@ -22,11 +25,19 @@ class Strategy : BaseStrategy() {
     }
 
     private fun processTick(passengers: List<MyPassenger>, elevators: List<MyElevator>, enemyPassengers: List<MyPassenger>, enemyElevators: List<MyElevator>) {
+        val allPassengers = passengers.plus(enemyPassengers)
+
         elevators.filter { it.state == ElevatorState.FILLING }.forEach {
+
+            if (!it.full && tick <= 1600 && it.floor == 1) {
+                startFilling(it, allPassengers)
+                return@forEach
+            }
+
             var welcomeCount = 0
 
             if (!it.full && (passengers.onTheFloor(it.floor) || enemyPassengers.onTheFloor(it.floor))) {
-                welcomeCount += toWelcome(passengers.plus(enemyPassengers), it)
+                welcomeCount += toWelcome(allPassengers, it)
             }
 
             if (welcomeCount == 0 && passengers.runningToElevator(it) == 0 && enemyPassengers.runningToElevator(it) == 0) {
@@ -38,9 +49,7 @@ class Strategy : BaseStrategy() {
                         it.goToFloor(totalOnFloor.avgFloor())
                     }
                 } else {
-                    if (it.full || tick > 1000) {
-                        it.goToFloor(getScore(it.passengers, it.floor).first)
-                    }
+                    it.goToFloor(getScore(it.passengers, it.floor).first)
                 }
             }
         }
@@ -91,5 +100,33 @@ class Strategy : BaseStrategy() {
         }
 
         return Pair(firstFloor, maxScore)
+    }
+
+    private fun getRandomFloors(eId: Int): Pair<Int, Int> {
+        if (startFloors.size == 2) {
+            startFloorMap[eId] = Pair(startFloors[0], startFloors[1])
+            return startFloorMap[eId]!!
+        }
+
+        var randomFloorPos = Random().nextInt(startFloors.size - 1)
+        val floor1 = startFloors[randomFloorPos]
+        startFloors.remove(floor1)
+
+        randomFloorPos = Random().nextInt(startFloors.size - 1)
+        val floor2 = startFloors[randomFloorPos]
+        startFloors.remove(floor2)
+
+        startFloorMap[eId] = Pair(floor1, floor2)
+        return startFloorMap[eId]!!
+    }
+
+    private fun startFilling(e: MyElevator, passengers: List<MyPassenger>) {
+        val floors = startFloorMap[e.id] ?: getRandomFloors(e.id!!)
+
+        passengers.getFromFloor(e.floor).filter { it.destFloor == floors.first || it.destFloor == floors.second }.forEach {
+            if (passengers.runningToElevator(e) + e.currentPassengers < MyElevator.MAX) {
+                it.setElevator(e)
+            }
+        }
     }
 }
