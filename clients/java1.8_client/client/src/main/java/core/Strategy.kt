@@ -8,25 +8,35 @@ import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
 //    companion object: KLogging()
-    var startFloors = Arrays.asList(2, 3, 4, 5, 6, 7, 8, 9).toMutableList()
-    var startFloorMap = HashMap<Int, Pair<Int, Int>>()
-    var tick = 0
+    private val walking = mutableListOf<IntArray>()
+    private var startFloors = Arrays.asList(2, 3, 4, 5, 6, 7, 8, 9).toMutableList()
+    private var startFloorMap = HashMap<Int, Pair<Int, Int>>()
+    private var tick = 0
+    private val prevState = HashMap<Int?, PassengerState>()
+
+    init {
+        (1..10).forEach { walking.add(IntArray(8000, {0})) }
+    }
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
     private fun List<MyPassenger>.onTheFloor(floor: Int): Boolean = this.any{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
     private fun List<MyPassenger>.getFromFloor(floor: Int): List<MyPassenger> = this.filter{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
-    private fun List<MyPassenger>.runningToElevator(e: MyElevator): Int = this.filter{ it.state != PassengerState.USING_ELEVATOR && it.elevator == e.id }.size
+    private fun List<MyPassenger>.runningToElevator(e: MyElevator): List<MyPassenger> = this.filter{ it.state != PassengerState.USING_ELEVATOR && it.elevator == e.id }
     private fun List<Passenger>.convert(isMy: Boolean): List<MyPassenger> = this.map { MyPassenger(it, isMy) }
-    private fun List<Int>.avgFloor(): Int = this.groupingBy { it }.eachCount().maxBy { it.value }?.key!!
 
     override fun onTick(myPassengers: List<Passenger>, myElevators: List<Elevator>, enemyPassengers: List<Passenger>, enemyElevators: List<Elevator>) {
         tick++
-
         processTick(myPassengers.convert(true), myElevators.convert(), enemyPassengers.convert(false), enemyElevators.convert())
     }
 
     private fun processTick(passengers: List<MyPassenger>, elevators: List<MyElevator>, enemyPassengers: List<MyPassenger>, enemyElevators: List<MyElevator>) {
         val allPassengers = passengers.plus(enemyPassengers)
+
+        allPassengers.filter { it.state == PassengerState.EXITING && prevState[it.id] != PassengerState.EXITING }.groupBy { it.destFloor }.forEach {
+            (0..499).forEach { t ->
+                walking[it.key][tick + 539 + t] += it.value.size
+            }
+        }
 
         elevators.filter { it.state == ElevatorState.FILLING }.forEach {
 
@@ -37,30 +47,43 @@ class Strategy : BaseStrategy() {
 
             var welcomeCount = 0
 
-            if (!it.full && (passengers.onTheFloor(it.floor) || enemyPassengers.onTheFloor(it.floor))) {
+            if (!it.full && allPassengers.onTheFloor(it.floor)) {
                 welcomeCount += toWelcome(allPassengers, it)
             }
 
-            if (welcomeCount == 0 && passengers.runningToElevator(it) == 0 && enemyPassengers.runningToElevator(it) == 0) {
+            if (welcomeCount == 0 && allPassengers.runningToElevator(it).isEmpty()) {
                 if (it.empty) {
-                    val enemyOnFloor = enemyPassengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR }.map { it.floor }
-                    val totalOnFloor = passengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR }.map { it.floor }.plus(enemyOnFloor)
-
-                    if (totalOnFloor.isNotEmpty()) {
-                        it.goToFloor(totalOnFloor.avgFloor())
-                    }
+                    it.goToFloor(getBestFloor(it, allPassengers))
                 } else {
                     it.goToFloor(getScore(it.passengers, it.floor).first)
                 }
             }
         }
+
+        allPassengers.forEach { prevState[it.id] = it.state }
+    }
+
+    //(9 - current floor) * 15 * count / 3
+
+    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>): Int {
+        var max = Pair(0, 1)
+        (1..9).filter { it != e.floor }.forEach {
+            val tickToFloor = Math.abs(it - e.floor) * 50 + 240
+            val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
+            val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
+            if (passengersArrive > max.first) {
+                max = Pair(passengersArrive, it)
+            }
+        }
+
+        return max.second
     }
 
     private fun toWelcome(passengers: List<MyPassenger>, e: MyElevator): Int {
         var count = 0
 
-        var need = MyElevator.MAX - (passengers.runningToElevator(e) + e.currentPassengers)
-        val totalPassengers = e.passengers.plus(passengers.filter { it.state != PassengerState.USING_ELEVATOR && it.elevator == e.id }).toMutableList()
+        var need = MyElevator.MAX - (passengers.runningToElevator(e).size + e.currentPassengers)
+        val totalPassengers = e.passengers.plus(passengers.runningToElevator(e)).toMutableList()
 
         while (need > 0) {
             val bestGroup = passengers.getFromFloor(e.floor).groupBy { it.destFloor }
@@ -97,19 +120,17 @@ class Strategy : BaseStrategy() {
         var maxScore = 0.0
 
         for ((key, value) in scoredFloors) {
-            (1..9)
-                    .filter { key != it }
-                    .forEach { floor ->
-                        val points = passengers.filter { it.destFloor == floor }.sumBy { it.score * Math.abs(it.fromFloor - floor) }
-                        val ticks = (Math.abs(key - floor) * 50 + 240)
+            (1..9).filter { key != it }.forEach { floor ->
+                val points = passengers.filter { it.destFloor == floor }.sumBy { it.score * Math.abs(it.fromFloor - floor) }
+                val ticks = (Math.abs(key - floor) * 50 + 240)
 
-                        val pps = (points.toDouble() + value.first) / (ticks.toDouble() + value.second)
+                val pps = (points.toDouble() + value.first) / (ticks.toDouble() + value.second)
 
-                        if (pps > maxScore) {
-                            maxScore = pps
-                            firstFloor = key
-                        }
-                    }
+                if (pps > maxScore) {
+                    maxScore = pps
+                    firstFloor = key
+                }
+            }
         }
 
         return Pair(firstFloor, maxScore)
@@ -137,7 +158,7 @@ class Strategy : BaseStrategy() {
         val floors = startFloorMap[e.id] ?: getRandomFloors(e.id!!)
 
         passengers.getFromFloor(e.floor).filter { it.destFloor == floors.first || it.destFloor == floors.second }.forEach {
-            if (passengers.runningToElevator(e) + e.currentPassengers < MyElevator.MAX) {
+            if (passengers.runningToElevator(e).size + e.currentPassengers < MyElevator.MAX) {
                 it.setElevator(e)
             }
         }

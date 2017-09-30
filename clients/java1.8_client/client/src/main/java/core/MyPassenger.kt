@@ -34,8 +34,8 @@ class MyPassenger(private val passenger: Passenger, val isMy: Boolean) {
     val y: Double?
         get() = passenger.y
 
-//    val weight: Double?
-//        get() = passenger.weight
+    val weight: Double?
+        get() = passenger.weight
 
     val score: Int
         get() = if (isMy) 10 else 20
