@@ -2,16 +2,16 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-import mu.KLogging
+//import mu.KLogging
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
-    companion object: KLogging()
+//    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
     private var startFloorMap: HashMap<Int, Pair<Int, Int>>
     private var tick = 0
     private val prevState = HashMap<Int?, PassengerState>()
-    private var prevVisible = listOf<Int>()
+    private var prevVisible = listOf<MyPassenger>()
 
     init {
         (1..10).forEach { walking.add(IntArray(8000, {0})) }
@@ -46,18 +46,18 @@ class Strategy : BaseStrategy() {
             }
         }
 
-        allPassengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR && !prevVisible.contains(it.id) }.groupBy { it.destFloor }.forEach {
+        allPassengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR && !prevVisible.map { p -> p.id }.contains(it.id) }.groupBy { it.destFloor }.forEach {
             (0..499).forEach { t ->
                 walking[it.key][tick + t] -= it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
             }
         }
 
-//        val nowDisappear = prevVisible.minus(allPassengers)
-//        nowDisappear.filter { prevState[it.id] == PassengerState.MOVING_TO_FLOOR }.groupBy { it.destFloor }.forEach {
-//            (0..499).forEach { t ->
-//                walking[it.key][tick + 499 + t] += it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
-//            }
-//        }
+        val nowDisappear = prevVisible.filter { !allPassengers.map { a -> a.id }.contains(it.id) }
+        nowDisappear.filter { prevState[it.id] == PassengerState.MOVING_TO_FLOOR }.groupBy { it.destFloor }.forEach {
+            (0..499).forEach { t ->
+                walking[it.key][tick + 499 + t] += it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
+            }
+        }
 
         elevators.filter { it.state == ElevatorState.FILLING }.forEach {
 
@@ -74,8 +74,6 @@ class Strategy : BaseStrategy() {
                     val currentScore = getScore(it.passengers, it.floor)
                     val potentialScore = getBestFloor(it, allPassengers, elevators)
 
-                    logger.trace { "tick:$tick; e:${it.id}; cur:$currentScore; pot:$potentialScore" }
-
                     if (it.full || currentScore.second > potentialScore.second) {
                         it.goToFloor(currentScore.first)
                     } else {
@@ -86,7 +84,7 @@ class Strategy : BaseStrategy() {
         }
 
         allPassengers.forEach { prevState[it.id] = it.state }
-        prevVisible = allPassengers.map { it.id!! }
+        prevVisible = allPassengers
     }
 
     private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, es: List<MyElevator>): Pair<Int, Double> {
@@ -100,7 +98,7 @@ class Strategy : BaseStrategy() {
             val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
 
             val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
-            val ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 50)
+            val ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 50 + 240)
 
             if (ppt > maxPpt) {
                 maxPpt = ppt
@@ -108,7 +106,8 @@ class Strategy : BaseStrategy() {
             }
         }
 
-        return Pair(maxFloor, maxPpt)
+        val reduceParam = if (e.currentPassengers < 11) 1.0 else ((20 - e.currentPassengers) * 0.1)
+        return Pair(maxFloor, maxPpt * reduceParam)
     }
 
     private fun toWelcomeAll(passengers: List<MyPassenger>, e: MyElevator) {
