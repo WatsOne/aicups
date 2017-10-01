@@ -111,12 +111,20 @@ class Strategy : BaseStrategy() {
     }
 
     private fun toWelcomeAll(passengers: List<MyPassenger>, e: MyElevator) {
+        var need = MyElevator.MAX - (passengers.runningToElevator(e).size + e.currentPassengers)
+
         passengers.getFromFloor(e.floor).filter { !it.isMy }.forEach {
+            if (need == 0) return@forEach
+
             it.setElevator(e)
+            need--
         }
 
         passengers.getFromFloor(e.floor).filter { it.isMy }.forEach {
+            if (need == 0) return@forEach
+
             it.setElevator(e)
+            need--
         }
     }
 
