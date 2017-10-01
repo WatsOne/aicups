@@ -11,6 +11,7 @@ class Strategy : BaseStrategy() {
     private var startFloorMap: HashMap<Int, Pair<Int, Int>>
     private var tick = 0
     private val prevState = HashMap<Int?, PassengerState>()
+    private var prevVisible = listOf<Int>()
 
     init {
         (1..10).forEach { walking.add(IntArray(8000, {0})) }
@@ -45,6 +46,19 @@ class Strategy : BaseStrategy() {
             }
         }
 
+        allPassengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR && !prevVisible.contains(it.id) }.groupBy { it.destFloor }.forEach {
+            (0..499).forEach { t ->
+                walking[it.key][tick + t] -= it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
+            }
+        }
+
+//        val nowDisappear = prevVisible.minus(allPassengers)
+//        nowDisappear.filter { prevState[it.id] == PassengerState.MOVING_TO_FLOOR }.groupBy { it.destFloor }.forEach {
+//            (0..499).forEach { t ->
+//                walking[it.key][tick + 499 + t] += it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
+//            }
+//        }
+
         elevators.filter { it.state == ElevatorState.FILLING }.forEach {
 
             if (!it.full && tick <= 1600 && it.floor == 1) {
@@ -62,7 +76,7 @@ class Strategy : BaseStrategy() {
 
                     logger.trace { "tick:$tick; e:${it.id}; cur:$currentScore; pot:$potentialScore" }
 
-                    if ( currentScore.second > potentialScore.second) {
+                    if (it.full || currentScore.second > potentialScore.second) {
                         it.goToFloor(currentScore.first)
                     } else {
                         it.goToFloor(potentialScore.first)
@@ -72,6 +86,7 @@ class Strategy : BaseStrategy() {
         }
 
         allPassengers.forEach { prevState[it.id] = it.state }
+        prevVisible = allPassengers.map { it.id!! }
     }
 
     private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, es: List<MyElevator>): Pair<Int, Double> {
@@ -79,8 +94,8 @@ class Strategy : BaseStrategy() {
         var maxPpt = 0.0
 
         val movieList = es.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { it.nextFloor }
-        (1..9).filter { it != e.floor && !movieList.contains(it) }.forEach {
-            val tickToFloor = Math.abs(it - e.floor) * 50 + 240
+        (1..9).filter { !movieList.contains(it) }.forEach {
+            val tickToFloor = Math.abs(it - e.floor) * 50 + if (it == e.floor) 0 else 240
             val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
             val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
 
