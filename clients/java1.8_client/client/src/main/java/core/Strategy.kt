@@ -3,19 +3,26 @@ package core
 import core.API.Elevator
 import core.API.Passenger
 //import mu.KLogging
-import java.util.*
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
 //    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
-    private var startFloors = Arrays.asList(2, 3, 4, 5, 6, 7, 8, 9).toMutableList()
-    private var startFloorMap = HashMap<Int, Pair<Int, Int>>()
+    private var startFloorMap: HashMap<Int, Pair<Int, Int>>
     private var tick = 0
     private val prevState = HashMap<Int?, PassengerState>()
 
     init {
         (1..10).forEach { walking.add(IntArray(8000, {0})) }
+
+        startFloorMap = hashMapOf(2 to Pair(8, 9),
+                    1 to Pair(8, 9),
+                    4 to Pair(6, 7),
+                    3 to Pair(6, 7),
+                    6 to Pair(4, 5),
+                    5 to Pair(4, 5),
+                    8 to Pair(2, 3),
+                    7 to Pair(2, 3))
     }
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
@@ -53,7 +60,7 @@ class Strategy : BaseStrategy() {
 
             if (welcomeCount == 0 && allPassengers.runningToElevator(it).isEmpty()) {
                 if (it.empty) {
-                    it.goToFloor(getBestFloor(it, allPassengers))
+                    it.goToFloor(getBestFloor(it, allPassengers, elevators))
                 } else {
                     it.goToFloor(getScore(it.passengers, it.floor).first)
                 }
@@ -65,9 +72,10 @@ class Strategy : BaseStrategy() {
 
     //(9 - current floor) * 15 * count / 3
 
-    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>): Int {
+    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, es: List<MyElevator>): Int {
         var max = Pair(0, 1)
-        (1..9).filter { it != e.floor }.forEach {
+        val movieList = es.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { e.nextFloor }
+        (1..9).filter { it != e.floor && !movieList.contains(it) }.forEach {
             val tickToFloor = Math.abs(it - e.floor) * 50 + 240
             val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
             val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
@@ -136,26 +144,8 @@ class Strategy : BaseStrategy() {
         return Pair(firstFloor, maxScore)
     }
 
-    private fun getRandomFloors(eId: Int): Pair<Int, Int> {
-        if (startFloors.size == 2) {
-            startFloorMap[eId] = Pair(startFloors[0], startFloors[1])
-            return startFloorMap[eId]!!
-        }
-
-        var randomFloorPos = Random().nextInt(startFloors.size - 1)
-        val floor1 = startFloors[randomFloorPos]
-        startFloors.remove(floor1)
-
-        randomFloorPos = Random().nextInt(startFloors.size - 1)
-        val floor2 = startFloors[randomFloorPos]
-        startFloors.remove(floor2)
-
-        startFloorMap[eId] = Pair(floor1, floor2)
-        return startFloorMap[eId]!!
-    }
-
     private fun startFilling(e: MyElevator, passengers: List<MyPassenger>) {
-        val floors = startFloorMap[e.id] ?: getRandomFloors(e.id!!)
+        val floors = startFloorMap[e.id]!!
 
         passengers.getFromFloor(e.floor).filter { it.destFloor == floors.first || it.destFloor == floors.second }.forEach {
             if (passengers.runningToElevator(e).size + e.currentPassengers < MyElevator.MAX) {
