@@ -40,7 +40,7 @@ class Strategy : BaseStrategy() {
     private fun processTick(passengers: List<MyPassenger>, elevators: List<MyElevator>, enemyPassengers: List<MyPassenger>, enemyElevators: List<MyElevator>) {
         val allPassengers = passengers.plus(enemyPassengers)
 
-        allPassengers.filter { it.state == PassengerState.EXITING && prevState[it.id] != PassengerState.EXITING }.groupBy { it.destFloor }.forEach {
+        allPassengers.filter { it.state == PassengerState.EXITING && prevState[it.id] != PassengerState.EXITING }.filter { it.destFloor != 1 }.groupBy { it.destFloor }.forEach {
             (0..499).forEach { t ->
                 walking[it.key][tick + 539 + t] += it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
             }
@@ -53,7 +53,7 @@ class Strategy : BaseStrategy() {
         }
 
         val nowDisappear = prevVisible.filter { !allPassengers.map { a -> a.id }.contains(it.id) }
-        nowDisappear.filter { prevState[it.id] == PassengerState.MOVING_TO_FLOOR }.groupBy { it.destFloor }.forEach {
+        nowDisappear.filter { prevState[it.id] == PassengerState.MOVING_TO_FLOOR }.filter { it.destFloor != 1 }.groupBy { it.destFloor }.forEach {
             (0..499).forEach { t ->
                 walking[it.key][tick + 499 + t] += it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
             }
