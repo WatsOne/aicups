@@ -2,11 +2,11 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-//import mu.KLogging
+import mu.KLogging
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
-//    companion object: KLogging()
+    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
     private var startFloorMap: HashMap<Int, Pair<Int, Int>>
     private var tick = 0
@@ -41,7 +41,7 @@ class Strategy : BaseStrategy() {
 
         allPassengers.filter { it.state == PassengerState.EXITING && prevState[it.id] != PassengerState.EXITING }.groupBy { it.destFloor }.forEach {
             (0..499).forEach { t ->
-                walking[it.key][tick + 539 + t] += it.value.size
+                walking[it.key][tick + 539 + t] += it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
             }
         }
 
@@ -52,17 +52,21 @@ class Strategy : BaseStrategy() {
                 return@forEach
             }
 
-            var welcomeCount = 0
-
             if (!it.full && allPassengers.onTheFloor(it.floor)) {
-                welcomeCount += toWelcome(allPassengers, it)
-            }
+                toWelcomeAll(allPassengers, it)
+            } else {
+                if (allPassengers.runningToElevator(it).isEmpty()) {
 
-            if (welcomeCount == 0 && allPassengers.runningToElevator(it).isEmpty()) {
-                if (it.empty) {
-                    it.goToFloor(getBestFloor(it, allPassengers, elevators))
-                } else {
-                    it.goToFloor(getScore(it.passengers, it.floor).first)
+                    val currentScore = getScore(it.passengers, it.floor)
+                    val potentialScore = getBestFloor(it, allPassengers, elevators)
+
+                    logger.trace { "tick:$tick; e:${it.id}; cur:$currentScore; pot:$potentialScore" }
+
+                    if ( currentScore.second > potentialScore.second) {
+                        it.goToFloor(currentScore.first)
+                    } else {
+                        it.goToFloor(potentialScore.first)
+                    }
                 }
             }
         }
@@ -70,21 +74,36 @@ class Strategy : BaseStrategy() {
         allPassengers.forEach { prevState[it.id] = it.state }
     }
 
-    //(9 - current floor) * 15 * count / 3
+    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, es: List<MyElevator>): Pair<Int, Double> {
+        var maxFloor = e.floor
+        var maxPpt = 0.0
 
-    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, es: List<MyElevator>): Int {
-        var max = Pair(0, 1)
-        val movieList = es.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { e.nextFloor }
+        val movieList = es.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { it.nextFloor }
         (1..9).filter { it != e.floor && !movieList.contains(it) }.forEach {
             val tickToFloor = Math.abs(it - e.floor) * 50 + 240
             val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
             val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
-            if (passengersArrive > max.first) {
-                max = Pair(passengersArrive, it)
+
+            val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
+            val ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 50)
+
+            if (ppt > maxPpt) {
+                maxPpt = ppt
+                maxFloor = it
             }
         }
 
-        return max.second
+        return Pair(maxFloor, maxPpt)
+    }
+
+    private fun toWelcomeAll(passengers: List<MyPassenger>, e: MyElevator) {
+        passengers.getFromFloor(e.floor).filter { !it.isMy }.forEach {
+            it.setElevator(e)
+        }
+
+        passengers.getFromFloor(e.floor).filter { it.isMy }.forEach {
+            it.setElevator(e)
+        }
     }
 
     private fun toWelcome(passengers: List<MyPassenger>, e: MyElevator): Int {
