@@ -29,7 +29,7 @@ class Strategy : BaseStrategy() {
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
     private fun List<MyPassenger>.onTheFloor(floor: Int): Boolean = this.any{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
     private fun List<MyPassenger>.getFromFloor(floor: Int): List<MyPassenger> = this.filter{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
-    private fun List<MyPassenger>.runningToElevator(e: MyElevator): List<MyPassenger> = this.filter{ it.state != PassengerState.USING_ELEVATOR && it.elevator == e.id }
+    private fun List<MyPassenger>.runningToElevator(e: MyElevator): List<MyPassenger> = this.filter{ it.state == PassengerState.MOVING_TO_ELEVATOR && it.elevator == e.id }
     private fun List<Passenger>.convert(isMy: Boolean): List<MyPassenger> = this.map { MyPassenger(it, isMy) }
 
     override fun onTick(myPassengers: List<Passenger>, myElevators: List<Elevator>, enemyPassengers: List<Passenger>, enemyElevators: List<Elevator>) {
@@ -46,7 +46,7 @@ class Strategy : BaseStrategy() {
             }
         }
 
-        allPassengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR && !prevVisible.map { p -> p.id }.contains(it.id) }.groupBy { it.destFloor }.forEach {
+        allPassengers.filter { it.state == PassengerState.WAITING_FOR_ELEVATOR && !prevVisible.map { p -> p.id }.contains(it.id) }.groupBy { it.floor }.forEach {
             (0..499).forEach { t ->
                 walking[it.key][tick + t] -= it.value.filter { it.isMy }.size + it.value.filter { !it.isMy }.size * 2
             }
@@ -66,11 +66,11 @@ class Strategy : BaseStrategy() {
                 return@forEach
             }
 
+
             if (!it.full && allPassengers.onTheFloor(it.floor)) {
                 toWelcomeAll(allPassengers, it)
             } else {
-                if (allPassengers.runningToElevator(it).isEmpty()) {
-
+                if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
                     val currentScore = getScore(it.passengers, it.floor)
                     val potentialScore = getBestFloor(it, allPassengers, elevators)
 
@@ -93,12 +93,12 @@ class Strategy : BaseStrategy() {
 
         val movieList = es.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { it.nextFloor }
         (1..9).filter { !movieList.contains(it) }.forEach {
-            val tickToFloor = Math.abs(it - e.floor) * 50 + if (it == e.floor) 0 else 240
+            val tickToFloor = Math.abs(it - e.floor) * 50 + if (it == e.floor) 0 else 200
             val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
             val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
 
             val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
-            val ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 50 + 240)
+            val ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 50 + 200)
 
             if (ppt > maxPpt) {
                 maxPpt = ppt
@@ -158,7 +158,7 @@ class Strategy : BaseStrategy() {
                 .aggregate { _: Int, sum: Int?, p: MyPassenger, first: Boolean ->
                     Math.abs(p.fromFloor - p.destFloor) * p.score + if (first) 0 else sum!!
                 }
-                .mapValues { Pair(it.value, (Math.abs(currentFloor - it.key) * 50 + 240)) }
+                .mapValues { Pair(it.value, (Math.abs(currentFloor - it.key) * 50 + 200)) }
 
         if (scoredFloors.size == 1) {
             val floor = passengers[0].destFloor
@@ -171,7 +171,7 @@ class Strategy : BaseStrategy() {
         for ((key, value) in scoredFloors) {
             (1..9).filter { key != it }.forEach { floor ->
                 val points = passengers.filter { it.destFloor == floor }.sumBy { it.score * Math.abs(it.fromFloor - floor) }
-                val ticks = (Math.abs(key - floor) * 50 + 240)
+                val ticks = (Math.abs(key - floor) * 50 + 200)
 
                 val pps = (points.toDouble() + value.first) / (ticks.toDouble() + value.second)
 

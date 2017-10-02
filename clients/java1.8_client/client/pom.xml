@@ -17,7 +17,7 @@
     </properties>
 
     <build>
-        <finalName>baseline</finalName>
+        <finalName>current</finalName>
         <plugins>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -41,7 +41,7 @@
                 <executions>
                     <execution>
                         <id>compile</id>
-                        <phase>compile</phase>
+                        <phase>process-sources</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
