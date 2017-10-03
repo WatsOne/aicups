@@ -2,11 +2,11 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-//import mu.KLogging
+import mu.KLogging
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
-//    companion object: KLogging()
+    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
     private var startFloorMap: HashMap<Int, Pair<Int, Int>>
     private var tick = 0
@@ -67,12 +67,16 @@ class Strategy : BaseStrategy() {
             }
 
 
+//            if (!it.full) {
+//                toWelcome(allPassengers, it)
+//            }
+
             if (!it.full && allPassengers.onTheFloor(it.floor)) {
                 toWelcomeAll(allPassengers, it)
             } else {
                 if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
                     val currentScore = getScore(it.passengers, it.floor)
-                    val potentialScore = getBestFloor(it, allPassengers, elevators)
+                    val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
 
                     if (it.full || currentScore.second > potentialScore.second) {
                         it.goToFloor(currentScore.first)
@@ -87,18 +91,45 @@ class Strategy : BaseStrategy() {
         prevVisible = allPassengers
     }
 
-    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, es: List<MyElevator>): Pair<Int, Double> {
+    private fun getTicksToFloorMap(e: MyElevator, targetFloor: Int): Map<Int, Int> {
+        return (1..9).associateBy({it},
+                    {
+                        if (it == targetFloor) 0
+                        else {
+                            if (it < targetFloor) {
+                                50 * it
+                            } else {
+                                ((it - targetFloor) / e.speed!!).toInt()
+                            }
+                        }
+                    }
+        )
+    }
+
+    private fun getBestFloor(e: MyElevator, passengers: List<MyPassenger>, myEs: List<MyElevator>, enEs: List<MyElevator>): Pair<Int, Double> {
         var maxFloor = e.floor
         var maxPpt = 0.0
 
-        val movieList = es.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { it.nextFloor }
-        (1..9).filter { !movieList.contains(it) }.forEach {
-            val tickToFloor = Math.abs(it - e.floor) * 50 + if (it == e.floor) 0 else 200
-            val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
-            val passengersArrive = walking[it][tick + tickToFloor] + passengersWaiting
+        val ticksToFloorMap = getTicksToFloorMap(e, e.floor)
+        val myElevatorsNext = myEs.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { it.nextFloor }
 
-            val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
-            val ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 50 + 200)
+        val enemyMoving = enEs.filter { it.state == ElevatorState.MOVING }
+
+        (1..9).filter { !myElevatorsNext.contains(it) }.forEach {
+            val enemyTickToTarget = enemyMoving.filter { e -> e.nextFloor == it }.
+                    map {e -> (e.nextFloor!! - e.y!!) / e.speed!! }.maxBy { it }?.toInt() ?: 7200
+
+            val tickForDoors = if (it == e.floor) 0 else 100
+            val tickToFloor = ticksToFloorMap[it]!! + tickForDoors
+
+            var ppt = 0.0
+            if (tickToFloor < enemyTickToTarget) {
+                val passengersWaiting = passengers.getFromFloor(it).filter { it.timeToAway!! > tickToFloor }.size
+                val passengersArrive = walking[it][tick + tickToFloor + tickForDoors] + passengersWaiting
+
+                val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
+                ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 60 + 200)
+            }
 
             if (ppt > maxPpt) {
                 maxPpt = ppt
