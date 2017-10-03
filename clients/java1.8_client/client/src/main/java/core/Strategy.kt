@@ -2,11 +2,11 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-import mu.KLogging
+//import mu.KLogging
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
-    companion object: KLogging()
+//    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
     private var startFloorMap: HashMap<Int, Pair<Int, Int>>
     private var tick = 0
@@ -124,7 +124,7 @@ class Strategy : BaseStrategy() {
                 val passengersArrive = walking[it][tick + tickToFloor + tickForDoors] + passengersWaiting
 
                 val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
-                ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 60 + 200)
+                ppt = (passengersArrive.toDouble() / 4 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 60 + 200)
             }
 
             if (ppt > maxPpt) {
