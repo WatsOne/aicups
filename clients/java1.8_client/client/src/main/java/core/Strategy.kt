@@ -66,12 +66,8 @@ class Strategy : BaseStrategy() {
                 return@forEach
             }
 
-
-//            if (!it.full) {
-//                toWelcome(allPassengers, it)
-//            }
-
             if (!it.full && allPassengers.onTheFloor(it.floor)) {
+                toWelcome(allPassengers, it)
                 toWelcomeAll(allPassengers, it)
             } else {
                 if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
