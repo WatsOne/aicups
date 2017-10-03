@@ -74,7 +74,7 @@ class Strategy : BaseStrategy() {
                     val currentScore = getScore(it.passengers, it.floor)
                     val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
 
-                    if (it.full || currentScore.second > potentialScore.second) {
+                    if (tick > 5500 || it.full || currentScore.second > potentialScore.second) {
                         it.goToFloor(currentScore.first)
                     } else {
                         it.goToFloor(potentialScore.first)
