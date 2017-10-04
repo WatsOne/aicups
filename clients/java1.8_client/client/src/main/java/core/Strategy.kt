@@ -93,7 +93,7 @@ class Strategy : BaseStrategy() {
                         if (it == targetFloor) 0
                         else {
                             if (it < targetFloor) {
-                                50 * it
+                                50 * (targetFloor - it)
                             } else {
                                 ((it - targetFloor) / e.speed!!).toInt()
                             }
@@ -181,11 +181,28 @@ class Strategy : BaseStrategy() {
     }
 
     private fun getScore(passengers: List<MyPassenger>, currentFloor: Int): Pair<Int, Double> {
+        var speed = 0.02
+        passengers.forEach { p ->
+            speed /= p.weight!!
+        }
+
+        val tickToFloors = (1..9).associateBy({it},
+                {
+                    if (it == currentFloor) 0
+                    else {
+                        if (it < currentFloor) {
+                            50 * (currentFloor - it)
+                        } else {
+                            ((it - currentFloor) / speed).toInt()
+                        }
+                    }
+                })
+
         val scoredFloors = passengers.groupingBy { it.destFloor }
                 .aggregate { _: Int, sum: Int?, p: MyPassenger, first: Boolean ->
                     Math.abs(p.fromFloor - p.destFloor) * p.score + if (first) 0 else sum!!
                 }
-                .mapValues { Pair(it.value, (Math.abs(currentFloor - it.key) * 50 + 200)) }
+                .mapValues { Pair(it.value, tickToFloors[it.key]!!) }
 
         if (scoredFloors.size == 1) {
             val floor = passengers[0].destFloor
@@ -198,7 +215,16 @@ class Strategy : BaseStrategy() {
         for ((key, value) in scoredFloors) {
             (1..9).filter { key != it }.forEach { floor ->
                 val points = passengers.filter { it.destFloor == floor }.sumBy { it.score * Math.abs(it.fromFloor - floor) }
-                val ticks = (Math.abs(key - floor) * 50 + 200)
+
+                val ticks = if (floor < key) (key - floor) * 50
+                else {
+                    val restPassengers = passengers.minus(passengers.filter { p -> p.destFloor == key })
+                    var speedNew = 0.02
+                    restPassengers.forEach { p ->
+                        speedNew /= p.weight!!
+                    }
+                    ((floor - key) / speedNew).toInt()
+                }
 
                 val pps = (points.toDouble() + value.first) / (ticks.toDouble() + value.second)
 
