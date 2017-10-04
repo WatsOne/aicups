@@ -69,16 +69,19 @@ class Strategy : BaseStrategy() {
             if (!it.full && allPassengers.onTheFloor(it.floor)) {
                 toWelcome(allPassengers, it)
                 toWelcomeAll(allPassengers, it)
-            } else {
-                if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
-                    val currentScore = getScore(it.passengers, it.floor)
-                    val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
+            }
 
-                    if (tick > 5500 || it.full || currentScore.second > potentialScore.second) {
-                        it.goToFloor(currentScore.first)
-                    } else {
-                        it.goToFloor(potentialScore.first)
-                    }
+            if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
+                val currentScore = getScore(it.passengers, it.floor)
+                val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
+
+                if (tick > 5800 || it.full || currentScore.second > potentialScore.second) {
+                    it.goToFloor(currentScore.first)
+                } else {
+                    it.goToFloor(potentialScore.first)
+
+//                    logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
+//                    it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
                 }
             }
         }
@@ -124,7 +127,7 @@ class Strategy : BaseStrategy() {
                 val passengersArrive = walking[it][tick + tickToFloor + tickForDoors] + passengersWaiting
 
                 val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
-                ppt = (passengersArrive.toDouble() / 4 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 60 + 200)
+                ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 60 + 200)
             }
 
             if (ppt > maxPpt) {
@@ -141,13 +144,6 @@ class Strategy : BaseStrategy() {
         var need = MyElevator.MAX - (passengers.runningToElevator(e).size + e.currentPassengers)
 
         passengers.getFromFloor(e.floor).filter { !it.isMy }.forEach {
-            if (need == 0) return@forEach
-
-            it.setElevator(e)
-            need--
-        }
-
-        passengers.getFromFloor(e.floor).filter { it.isMy }.forEach {
             if (need == 0) return@forEach
 
             it.setElevator(e)
