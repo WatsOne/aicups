@@ -189,6 +189,8 @@ class Strategy : BaseStrategy() {
             speed /= p.weight!!
         }
 
+        speed = if (passengers.size > 10) (speed / 1.1) else speed
+
         val tickToFloors = (1..9).associateBy({it},
                 {
                     if (it == currentFloor) 0
@@ -205,7 +207,7 @@ class Strategy : BaseStrategy() {
                 .aggregate { _: Int, sum: Int?, p: MyPassenger, first: Boolean ->
                     Math.abs(p.fromFloor - p.destFloor) * p.score + if (first) 0 else sum!!
                 }
-                .mapValues { Pair(it.value, tickToFloors[it.key]!!) }
+                .mapValues { Pair(it.value, tickToFloors[it.key]!! + 240) }
 
         if (scoredFloors.size == 1) {
             val floor = passengers[0].destFloor
@@ -217,19 +219,23 @@ class Strategy : BaseStrategy() {
 
         for ((key, value) in scoredFloors) {
             (1..9).filter { key != it }.forEach { floor ->
-                val points = passengers.filter { it.destFloor == floor }.sumBy { it.score * Math.abs(it.fromFloor - floor) }
+
+                val restPassengers = passengers.minus(passengers.filter { p -> p.destFloor == key })
+                val points = restPassengers.filter { it.destFloor == floor }.sumBy { it.score * Math.abs(it.fromFloor - floor) }
 
                 val ticks = if (floor < key) (key - floor) * 50
                 else {
-                    val restPassengers = passengers.minus(passengers.filter { p -> p.destFloor == key })
                     var speedNew = 0.02
                     restPassengers.forEach { p ->
                         speedNew /= p.weight!!
                     }
+
+                    speedNew = if (restPassengers.size > 10) (speedNew / 1.1) else speedNew
+
                     ((floor - key) / speedNew).toInt()
                 }
 
-                val pps = (points.toDouble() + value.first) / (ticks.toDouble() + value.second)
+                val pps = (points.toDouble() + value.first) / (ticks.toDouble() + 240 + value.second)
 
                 if (pps > maxScore) {
                     maxScore = pps
