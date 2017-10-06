@@ -64,24 +64,30 @@ class Strategy : BaseStrategy() {
 
             if (!it.full && tick <= 2000 && it.floor == 1) {
                 startFilling(it, allPassengers)
-                return@forEach
-            }
-
-            if (!it.full && allPassengers.onTheFloor(it.floor) && (tick <= 140 || it.timeOnFloor!! > if (allPassengers.enemyOnTheFloor(it.floor)) 140 else 100)) {
-                toWelcome(allPassengers, it)
-                toWelcomeAll(allPassengers, it, MyElevator.MAX - (allPassengers.runningToElevator(it).size + it.currentPassengers))
             } else {
-                if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
-                    val currentScore = getScore(it.passengers, it.floor)
-                    val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
+                if (!it.full && allPassengers.onTheFloor(it.floor) && (tick <= 140 || it.timeOnFloor!! > if (allPassengers.enemyOnTheFloor(it.floor)) 140 else 100)) {
+                    toWelcome(allPassengers, it)
+                    toWelcomeAll(allPassengers, it, MyElevator.MAX - (allPassengers.runningToElevator(it).size + it.currentPassengers))
+                } else {
+                    if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
+                        val currentScore = getScore(it.passengers, it.floor)
+                        val leftTicks = 4000 - tick
 
-                    if (tick > 6000 || it.full || currentScore.second > potentialScore.second) {
-                        it.goToFloor(currentScore.first)
-                    } else {
-                        it.goToFloor(potentialScore.first)
+                        if (currentScore.ticks > leftTicks) {
+                            val m = getMaxFloorForEnd(it, leftTicks)
+                            it.goToFloor(m)
+                        } else {
+                            val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
 
-//                    logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
-//                    it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
+                            if (it.full || currentScore.ppt > potentialScore.second) {
+                                it.goToFloor(currentScore.firstFloor)
+                            } else {
+                                it.goToFloor(potentialScore.first)
+
+                                //                    logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
+                                //                    it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
+                            }
+                        }
                     }
                 }
             }
@@ -172,9 +178,9 @@ class Strategy : BaseStrategy() {
 
         while (need > 0) {
             val bestGroup = passengers.getFromFloor(e.floor, e).groupBy { it.destFloor }
-                    .mapValues { getScore(totalPassengers.plus(it.value), e.floor) }.maxBy { it.value.second }
+                    .mapValues { getScore(totalPassengers.plus(it.value), e.floor) }.maxBy { it.value.ppt }
 
-            if (bestGroup?.value?.second ?: 0.0 > getScore(totalPassengers, e.floor).second) {
+            if (bestGroup?.value?.ppt ?: 0.0 > getScore(totalPassengers, e.floor).ppt) {
                 passengers.getFromFloor(e.floor, e).filter { it.destFloor == bestGroup?.key }.forEach {
                     it.setElevator(e)
                     totalPassengers.add(it)
@@ -189,7 +195,7 @@ class Strategy : BaseStrategy() {
         return count
     }
 
-    private fun getScore(passengers: List<MyPassenger>, currentFloor: Int): Pair<Int, Double> {
+    private fun getScoredMap(passengers: List<MyPassenger>, currentFloor: Int): Map<Int, Pair<Int, Int>> {
         var speed = 0.02
         passengers.forEach { p ->
             speed /= p.weight!!
@@ -209,19 +215,25 @@ class Strategy : BaseStrategy() {
                     }
                 })
 
-        val scoredFloors = passengers.groupingBy { it.destFloor }
+        return passengers.groupingBy { it.destFloor }
                 .aggregate { _: Int, sum: Int?, p: MyPassenger, first: Boolean ->
                     Math.abs(p.fromFloor - p.destFloor) * p.score + if (first) 0 else sum!!
                 }
-                .mapValues { Pair(it.value, tickToFloors[it.key]!! + 240) }
+                .mapValues { Pair(it.value, tickToFloors[it.key]!! + 200) }
+    }
+
+    private fun getScore(passengers: List<MyPassenger>, currentFloor: Int): Route {
+
+        val scoredFloors = getScoredMap(passengers, currentFloor)
 
         if (scoredFloors.size == 1) {
             val floor = passengers[0].destFloor
-            return Pair(floor, scoredFloors[floor]!!.first.toDouble() / scoredFloors[floor]!!.second)
+            return Route(floor, scoredFloors[floor]!!.first.toDouble() / scoredFloors[floor]!!.second, scoredFloors[floor]!!.second)
         }
 
         var firstFloor = 1
         var maxScore = 0.0
+        var maxSumTicks = 0
 
         for ((key, value) in scoredFloors) {
             (1..9).filter { key != it }.forEach { floor ->
@@ -241,16 +253,23 @@ class Strategy : BaseStrategy() {
                     ((floor - key) / speedNew).toInt()
                 }
 
-                val pps = (points.toDouble() + value.first) / (ticks.toDouble() + 240 + value.second)
+                val sumTicks = ticks + 240 + value.second
+                val pps = (points.toDouble() + value.first) / sumTicks.toDouble()
 
                 if (pps > maxScore) {
                     maxScore = pps
                     firstFloor = key
+                    maxSumTicks = sumTicks
                 }
             }
         }
 
-        return Pair(firstFloor, maxScore)
+        return Route(firstFloor, maxScore, maxSumTicks)
+    }
+
+    private fun getMaxFloorForEnd(e: MyElevator, restTick: Int): Int {
+        val scoredMap = getScoredMap(e.passengers, e.floor)
+        return scoredMap.filter { it.value.second < restTick }.maxBy { it.value.first }?.key ?: 1
     }
 
     private fun startFilling(e: MyElevator, passengers: List<MyPassenger>) {
