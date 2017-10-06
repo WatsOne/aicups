@@ -2,11 +2,11 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-//import mu.KLogging
+import mu.KLogging
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
-//    companion object: KLogging()
+    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
     private var startFloorMap: HashMap<Int, IntRange>
     private var tick = 0
@@ -113,9 +113,15 @@ class Strategy : BaseStrategy() {
         val ticksToFloorMap = getTicksToFloorMap(e, e.floor)
         val myElevatorsNext = myEs.filter { it != e && (it.state == ElevatorState.MOVING || it.state == ElevatorState.CLOSING) }.map { it.nextFloor }
 
+        val myElevatorStanding = myEs.filter { it.state == ElevatorState.FILLING || it.state == ElevatorState.OPENING}
+        val nearFloor = Pair(e.floor - 1, e.floor + 1)
+
         val enemyMoving = enEs.filter { it.state == ElevatorState.MOVING }
 
         (1..9).filter { !myElevatorsNext.contains(it) }.forEach {
+            val hasNearMyElevator = myElevatorStanding.any { e -> e.floor == it }
+            val notGoToNear = (it == nearFloor.first || it == nearFloor.second) && hasNearMyElevator
+
             val enemyTickToTarget = enemyMoving.filter { e -> e.nextFloor == it }.
                     map {e -> (e.nextFloor!! - e.y!!) / e.speed!! }.maxBy { it }?.toInt() ?: 7200
 
@@ -123,7 +129,7 @@ class Strategy : BaseStrategy() {
             val tickToFloor = ticksToFloorMap[it]!! + tickForDoors
 
             var ppt = 0.0
-            if (tickToFloor < enemyTickToTarget) {
+            if (tickToFloor < enemyTickToTarget && !notGoToNear) {
                 val passengersWaiting = passengers.getFromFloor(it, e).filter { it.timeToAway!! > tickToFloor }.size
                 val passengersArrive = walking[it][tick + tickToFloor + tickForDoors] + passengersWaiting
 
