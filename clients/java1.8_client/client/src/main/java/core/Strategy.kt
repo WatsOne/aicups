@@ -2,11 +2,11 @@ package core
 
 import core.API.Elevator
 import core.API.Passenger
-import mu.KLogging
+//import mu.KLogging
 import kotlin.collections.HashMap
 
 class Strategy : BaseStrategy() {
-    companion object: KLogging()
+//    companion object: KLogging()
     private val walking = mutableListOf<IntArray>()
     private var startFloorMap: HashMap<Int, IntRange>
     private var tick = 0
@@ -71,21 +71,23 @@ class Strategy : BaseStrategy() {
                 } else {
                     if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
                         val currentScore = getScore(it.passengers, it.floor)
-                        val leftTicks = 4000 - tick
+                        val leftTicks = 7200 - tick
 
                         if (currentScore.ticks > leftTicks) {
                             val m = getMaxFloorForEnd(it, leftTicks)
                             it.goToFloor(m)
                         } else {
-                            val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
+                            if (it.full || !waiting(it, currentScore.ppt)) {
+                                val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
 
-                            if (it.full || currentScore.ppt > potentialScore.second) {
-                                it.goToFloor(currentScore.firstFloor)
-                            } else {
-                                it.goToFloor(potentialScore.first)
+                                if (it.full || currentScore.ppt > potentialScore.second) {
+                                    it.goToFloor(currentScore.firstFloor)
+                                } else {
+                                    it.goToFloor(potentialScore.first)
 
-                                //                    logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
-                                //                    it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
+                                    //                    logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
+                                    //                    it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
+                                }
                             }
                         }
                     }
@@ -139,8 +141,8 @@ class Strategy : BaseStrategy() {
                 val passengersWaiting = passengers.getFromFloor(it, e).filter { it.timeToAway!! > tickToFloor }.size
                 val passengersArrive = walking[it][tick + tickToFloor + tickForDoors] + passengersWaiting
 
-                val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
-                ppt = (passengersArrive.toDouble() / 3 * maxPotentialFloor * 10) / (tickToFloor.toDouble() + maxPotentialFloor * 60 + 200)
+//                val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
+                ppt = (passengersArrive.toDouble() / 3 * 4 * 10) / (tickToFloor.toDouble() + 4 * 60 + 240)
             }
 
             if (ppt > maxPpt) {
@@ -265,6 +267,17 @@ class Strategy : BaseStrategy() {
         }
 
         return Route(firstFloor, maxScore, maxSumTicks)
+    }
+
+    private fun waiting(e: MyElevator, score: Double): Boolean {
+        val reduceParam = if (e.currentPassengers < 11) 1.0 else ((20 - e.currentPassengers) * 0.1)
+        (tick + 1..tick + 50).forEach {
+            val potScore = (walking[e.floor][it] / 3 * 4 * 10) / (4 * 60 + 240)
+            if (potScore * reduceParam > score) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun getMaxFloorForEnd(e: MyElevator, restTick: Int): Int {
