@@ -22,8 +22,8 @@ class Strategy : BaseStrategy() {
                     3 to (7..9),
                     6 to (5..7),
                     5 to (5..7),
-                    8 to (1..4),
-                    7 to (1..4))
+                    8 to (4..5),
+                    7 to (4..5))
     }
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
@@ -186,7 +186,7 @@ class Strategy : BaseStrategy() {
         }
 
         var need = MyElevator.MAX - (passengers.runningToElevator(e).size + e.currentPassengers)
-        passengers.getFromFloor(e.floor, e).filter { !it.isMy && it.timeToAway!! > getTickToElevator(e) }.forEach {
+        passengers.getFromFloor(e.floor, e).filter { it.timeToAway!! > getTickToElevator(e) }.forEach {
             if (need <= 0) return@forEach
 
             it.setElevator(e)
@@ -294,7 +294,7 @@ class Strategy : BaseStrategy() {
     private fun waiting(e: MyElevator, score: Double): Boolean {
         val reduceParam = if (e.currentPassengers < 11) 1.0 else ((20 - e.currentPassengers) * 0.1)
         (tick + 1..tick + 160).forEach {
-            val potScore = (walking[e.floor][it] / 3 * 4 * 10) / (4 * 60 + 240)
+            val potScore = (walking[e.floor][it] / 3 * 4 * 10).toDouble() / (4 * 60 + 240)
             if (potScore * reduceParam > score) {
                 return true
             }
