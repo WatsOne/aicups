@@ -27,7 +27,7 @@ class Strategy : BaseStrategy() {
     }
 
     private fun List<Elevator>.convert(): List<MyElevator> = this.map { MyElevator(it) }
-    private fun List<MyPassenger>.onTheFloor(floor: Int): Boolean = this.any{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor }
+    private fun List<MyPassenger>.onTheFloor(floor: Int): Boolean = this.any{ (it.state == PassengerState.WAITING_FOR_ELEVATOR || it.state == core.PassengerState.RETURNING) && it.floor == floor }
     private fun List<MyPassenger>.enemyOnTheFloor(floor: Int): Boolean = this.any{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor && !it.isMy }
     private fun List<MyPassenger>.getFromFloor(floor: Int, e: MyElevator): List<MyPassenger> = this.filter{ it.state == PassengerState.WAITING_FOR_ELEVATOR && it.floor == floor && it.elevator != e.id }
     private fun List<MyPassenger>.runningToElevator(e: MyElevator): List<MyPassenger> = this.filter{ (it.state == core.PassengerState.WAITING_FOR_ELEVATOR || it.state == PassengerState.MOVING_TO_ELEVATOR) && it.elevator == e.id }
@@ -65,29 +65,37 @@ class Strategy : BaseStrategy() {
             if (!it.full && tick <= 2000 && it.floor == 1) {
                 startFilling(it, allPassengers)
             } else {
-                if (!it.full && allPassengers.onTheFloor(it.floor) && (tick <= 140 || it.timeOnFloor!! > if (allPassengers.enemyOnTheFloor(it.floor)) 140 else 100)) {
-                    toWelcome(allPassengers, it)
-                    toWelcomeAll(allPassengers, it, MyElevator.MAX - (allPassengers.runningToElevator(it).size + it.currentPassengers))
+
+                val bound = it.id in (5..8)
+                val canWelcome = tick <= 140 || it.timeOnFloor!! > if (allPassengers.enemyOnTheFloor(it.floor)) 140 else 100
+
+                if (!it.full && bound && canWelcome) {
+                    toWelcomeForBounds(allPassengers, it)
                 } else {
-                    if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
-                        val currentScore = getScore(it.passengers, it.floor)
-                        val leftTicks = 7200 - tick
+                    if (!it.full && allPassengers.onTheFloor(it.floor) && canWelcome) {
+                        toWelcome(allPassengers, it)
+                        toWelcomeAll(allPassengers, it, MyElevator.MAX - (allPassengers.runningToElevator(it).size + it.currentPassengers))
+                    }
+                }
 
-                        if (currentScore.ticks > leftTicks) {
-                            val m = getMaxFloorForEnd(it, leftTicks)
-                            it.goToFloor(m)
-                        } else {
-                            if (it.full || !waiting(it, currentScore.ppt)) {
-                                val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
+                if ((allPassengers.runningToElevator(it).isEmpty() || it.full) && it.timeOnFloor!! > 140) {
+                    val currentScore = getScore(it.passengers, it.floor)
+                    val leftTicks = 7200 - tick
 
-                                if (it.full || currentScore.ppt > potentialScore.second) {
-                                    it.goToFloor(currentScore.firstFloor)
-                                } else {
-                                    it.goToFloor(potentialScore.first)
+                    if (currentScore.ticks > leftTicks) {
+                        val m = getMaxFloorForEnd(it, leftTicks)
+                        it.goToFloor(m)
+                    } else {
+                        if (it.full || !waiting(it, currentScore.ppt)) {
+                            val potentialScore = getBestFloor(it, allPassengers, elevators, enemyElevators)
 
-                                    //                    logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
-                                    //                    it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
-                                }
+                            if (it.full || currentScore.ppt > potentialScore.second) {
+                                it.goToFloor(currentScore.firstFloor)
+                            } else {
+                                it.goToFloor(potentialScore.first)
+
+                                //logger.trace { "$tick; id:${it.id}; cur:$currentScore; pot:$potentialScore" }
+                                //it.passengers.groupBy { p -> p.destFloor }.forEach { g -> logger.trace { "dest: ${g.key}; count:${g.value.size}" } }
                             }
                         }
                     }
@@ -138,8 +146,8 @@ class Strategy : BaseStrategy() {
 
             var ppt = 0.0
             if (tickToFloor < enemyTickToTarget && !notGoToNear) {
-                val passengersWaiting = passengers.getFromFloor(it, e).filter { it.timeToAway!! > tickToFloor }.size
-                val passengersArrive = walking[it][tick + tickToFloor + tickForDoors] + passengersWaiting
+                val passengersWaiting = passengers.getFromFloor(it, e).filter { it.timeToAway!! > (tickToFloor + tickToFloor + getTickToElevator(e)) }.size
+                val passengersArrive = walking[it][tick + tickToFloor + tickForDoors + getTickToElevator(e)] + passengersWaiting
 
 //                val maxPotentialFloor = if (it > 4) (9 - (9 - it)) else (9 - it)
                 ppt = (passengersArrive.toDouble() / 3 * 4 * 10) / (tickToFloor.toDouble() + 4 * 60 + 240)
@@ -165,6 +173,20 @@ class Strategy : BaseStrategy() {
         }
 
         passengers.getFromFloor(e.floor, e).filter { it.isMy }.forEach {
+            if (need <= 0) return@forEach
+
+            it.setElevator(e)
+            need--
+        }
+    }
+
+    private fun toWelcomeForBounds(passengers: List<MyPassenger>, e: MyElevator) {
+        passengers.getFromFloor(e.floor, e).filter { it.timeToAway!! > getTickToElevator(e) }.forEach {
+            toWelcome(passengers, e)
+        }
+
+        var need = MyElevator.MAX - (passengers.runningToElevator(e).size + e.currentPassengers)
+        passengers.getFromFloor(e.floor, e).filter { !it.isMy && it.timeToAway!! > getTickToElevator(e) }.forEach {
             if (need <= 0) return@forEach
 
             it.setElevator(e)
@@ -271,7 +293,7 @@ class Strategy : BaseStrategy() {
 
     private fun waiting(e: MyElevator, score: Double): Boolean {
         val reduceParam = if (e.currentPassengers < 11) 1.0 else ((20 - e.currentPassengers) * 0.1)
-        (tick + 1..tick + 50).forEach {
+        (tick + 1..tick + 160).forEach {
             val potScore = (walking[e.floor][it] / 3 * 4 * 10) / (4 * 60 + 240)
             if (potScore * reduceParam > score) {
                 return true
@@ -283,6 +305,16 @@ class Strategy : BaseStrategy() {
     private fun getMaxFloorForEnd(e: MyElevator, restTick: Int): Int {
         val scoredMap = getScoredMap(e.passengers, e.floor)
         return scoredMap.filter { it.value.second < restTick }.maxBy { it.value.first }?.key ?: 1
+    }
+
+    private fun getTickToElevator(e: MyElevator): Int {
+        return when (e.id) {
+            2,1 -> 40
+            4,3 -> 80
+            6,5 -> 120
+            8,7 -> 160
+            else -> 0
+        }
     }
 
     private fun startFilling(e: MyElevator, passengers: List<MyPassenger>) {
